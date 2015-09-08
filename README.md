@@ -21,3 +21,6 @@ R.image_name
 * Automatically import Xcode project with asset files
 * Support symbolic alias [(1) file - (n) method]
 * Support Xcode's i18n policy
+* Generate a util category for taking UIImage or SVGKImage. 
+* ```ex) R.image_name.image / [[R.image_name] imageAsSVG:(CGSize)size]```
+
