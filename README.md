@@ -15,3 +15,6 @@ and then, You can use it like below after import.
 ```objective-c
 R.image_name
 ```
+
+# TODO
+Integration with [Termini](https://github.com/metasmile/termini)
