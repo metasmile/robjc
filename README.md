@@ -19,3 +19,4 @@ R.image_name
 # TODO
 * Integration with [Termini](https://github.com/metasmile/termini)
 * Automatically import Xcode project with asset files
+* Supports symbolic alias [(1) file - (n) method]
