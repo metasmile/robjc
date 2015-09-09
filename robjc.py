@@ -5,24 +5,6 @@
 #
 # Copyright (c) 2015 Xoropsax cyrano905@gmail.com (github.com/metasmile)
 #
-# Permission is hereby granted, free of charge, to any person obtaining a copy
-# of this software and associated documentation files (the "Software"), to deal
-# in the Software without restriction, including without limitation the rights
-# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-# copies of the Software, and to permit persons to whom the Software is
-# furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in
-# all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-# THE SOFTWARE.
-#
 
 import time
 import os
@@ -63,13 +45,12 @@ def begin_objc_interface(class_name):
 def begin_objc_implementation(class_name):
     content = '#import <Foundation/Foundation.h>\n'
     content += '#import "'+class_name+'.h"\n\n'
-    content += '@implementation '+class_name+' : NSObject\n\n'
+    content += '@implementation '+class_name+'\n\n'
     return content
 
 def end_objc_file(path, content):
     content += '@end'
     path = path if os.path.isabs(path) else os.path.join(__RESOURCE_PATH__, path)
-    print path
     f = open(path, 'w')
     f.write(content)
     f.close()
