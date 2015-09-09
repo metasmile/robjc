@@ -20,6 +20,7 @@ __RESOURCE_PATH__ = expanduser(sys.argv[1])
 __RESOURCE_CLASS_DEST_PATH__ = expanduser(sys.argv[2]) if len(sys.argv)==3 else './'
 __RESOURCE_CLASS__ = sys.argv[3] if len(sys.argv)==4 else 'R'
 __DELIMETER__ = '_'
+__DELIMETER_ALIAS__ = '='
 
 #
 # define func
@@ -66,6 +67,14 @@ if __name__ == "__main__":
     impl_file_content = begin_objc_implementation(__RESOURCE_CLASS__)
     cnt = 0
 
+    def append_file(file_name, file):
+        _method_line = '+ (NSString *)'+file_name+';'
+
+        global header_file_content
+        global impl_file_content
+        header_file_content += (_method_line + '\n\n')
+        impl_file_content += (_method_line + ' {\n    return @"'+file+'";\n}\n\n')
+
     for root, dirs, files in os.walk(__RESOURCE_PATH__):
         cur_dir = os.path.basename(root)
         if not cur_dir:
@@ -78,14 +87,12 @@ if __name__ == "__main__":
                 continue
 
             _file = os.path.basename(file)
-            _file_name = os.path.splitext(_file)[0]
-            _method_line = '+ (NSString *)'+_file_name+';'
 
-            header_file_content += _method_line + '\n\n'
-            impl_file_content += _method_line + ' {\n    return @"'+_file+'";\n}\n\n'
+            [[append_file(_alias, _file)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
+
             cnt+=1
 
-    print end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
-    print end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.m'), impl_file_content)
+    end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
+    end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.m'), impl_file_content)
 
 print 'all done.', cnt, (time.time() - start)
