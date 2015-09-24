@@ -62,5 +62,5 @@ R.blabla
 * [x] Support symbolic alias [(1) file - (n) method]
 * [ ] Support Xcode's i18n policy
 * [ ] Generate a util category for taking UIImage or SVGKImage.
+* ```ex) R.image_name.image / [[R.image_name] imageAsSVG:(CGSize)size]```
 * [ ] Support DIR structure mapping 
-```ex) R.image_name.image / [[R.image_name] imageAsSVG:(CGSize)size]```
