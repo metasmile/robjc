@@ -27,7 +27,7 @@ __DELIMETER_ALIAS__ = '='
 # define func
 #
 def resolve_chars(name):
-    return re.sub('[^_\w]', '_ERR_', re.sub('^[0-9]', '_'+name[0], name).replace(' ',''))
+    return re.sub('[^_\w]', '__', re.sub('^[0-9]', '_'+name[0], name).replace(' ',''))
 
 def get_splited_first(str, delimeter):
     s_arr = str.split(delimeter)
@@ -66,7 +66,7 @@ def begin_objc_implementation_file(class_name):
         #import \"{0}.h\"
 
         #define ROBJC_DispatchOnce(block) static dispatch_once_t onceToken; dispatch_once(&onceToken, block);
-        
+
         """\
     .format(class_name))
 
@@ -146,6 +146,7 @@ if __name__ == "__main__":
         global impl_file_content
         header_file_content += (_method_line + '\n\n')
         impl_file_content += (_method_line + make_method_content(make_return_string_line(file)) + '\n')
+        return _method_line
 
     def append_class(class_name):
         global header_file_content
@@ -163,22 +164,28 @@ if __name__ == "__main__":
 #MARK: file system
     def append_files(type, dir, files, isstatic):
         global cnt
+        _exists_name_dic = {}
         for file_name in files:
             file = os.path.join(dir, file_name)
             if check_ignore(file):
                 continue
+
             _file = os.path.basename(file)
-            [[append_method(type, _alias, _file, isstatic)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
+            _names = os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)
+
+            for _filename in _names:
+                _method = re.sub('^[+-]\s\(NSString\s\*\)', '', append_method(type, '{0}_{1}'.format(_filename, os.path.splitext(_file)[1][1:]) if _filename in _exists_name_dic else _filename, _file, isstatic))
+                _paths = [ resolve_chars(path) if len(path)>0 else None for path in os.path.split(os.path.relpath(file,__RESOURCE_PATH__))[0].split(os.sep)]
+                _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0]==None else [__RESOURCE_CLASS__] + _paths +[_method]
+                _exists_name_dic[_filename] = _file
+                if(_merged[-1] != __RESOURCE_CLASS__):
+                    print '.'.join(_merged)
+
             cnt+=1
 
     for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
-        dirname = os.path.basename(dir)
-        if not dirname:
-            continue
-
         isroot = dir == __RESOURCE_PATH__
-
-        append_class(subdir_class_name(None if isroot else dirname))
+        append_class(subdir_class_name(None if isroot else os.path.basename(dir)))
         append_files('NSString *', dir, files, isroot)
         [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
         append_end()
