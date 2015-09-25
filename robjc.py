@@ -6,23 +6,28 @@
 # Copyright (c) 2015 Xoropsax cyrano905@gmail.com (github.com/metasmile)
 #
 
-import time
-import os
-import sys
-import re
-import textwrap
+import time, os, sys, re, textwrap, argparse, pprint
 from os.path import expanduser
 
-if len(sys.argv) == 1:
-    print 'usage : python robjc.py [target dir] [destination dir] [class name]'
-    sys.exit(0)
+parser = argparse.ArgumentParser(description='Objective-c resource class generator')
+parser.add_argument('<target path>', help='Target path to read directories', default='.', nargs='?')
+parser.add_argument('<destination path>', help='Destination path to create a class file.', default='.', nargs='?')
+parser.add_argument('-c','--class-name', help='Class name.(default='R')', required=False, default='R', nargs='?')
+parser.add_argument('-m','--map-dir-structure', help='Map structure of all directories from target path.', required=False, default=False, nargs='?')
+parser.add_argument('-l','--show-log', help='Show log', required=False, default=False, nargs='?')
+args = vars(parser.parse_args())
 
-__RESOURCE_PATH__ = expanduser(sys.argv[1])
-__RESOURCE_CLASS_DEST_PATH__ = expanduser(sys.argv[2]) if len(sys.argv)==3 else './'
-__RESOURCE_CLASS__ = sys.argv[3] if len(sys.argv)==4 else 'R'
+if args['show_log'] is not None: sys.stdout = open(os.devnull, "w")
+
+print 'Start by option:\n'
+pprint.pprint(args, width=1)
+
+__RESOURCE_PATH__ = expanduser(args['<target path>'])
+__RESOURCE_CLASS_DEST_PATH__ = expanduser(expanduser(args['<destination path>']))
+__RESOURCE_CLASS__ = args['class_name']
+__MAP_DIR__ = args['map_dir_structure'] is None
 __DELIMETER__ = '_'
 __DELIMETER_ALIAS__ = '='
-
 #
 # define func
 #
@@ -175,19 +180,29 @@ if __name__ == "__main__":
 
             for _filename in _names:
                 _method = re.sub('^[+-]\s\(NSString\s\*\)', '', append_method(type, '{0}_{1}'.format(_filename, os.path.splitext(_file)[1][1:]) if _filename in _exists_name_dic else _filename, _file, isstatic))
-                _paths = [ resolve_chars(path) if len(path)>0 else None for path in os.path.split(os.path.relpath(file,__RESOURCE_PATH__))[0].split(os.sep)]
-                _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0]==None else [__RESOURCE_CLASS__] + _paths +[_method]
-                _exists_name_dic[_filename] = _file
-                if(_merged[-1] != __RESOURCE_CLASS__):
-                    print '.'.join(_merged)
+                if __MAP_DIR__:
+                    _paths = [ resolve_chars(path) if len(path)>0 else None for path in os.path.split(os.path.relpath(file,__RESOURCE_PATH__))[0].split(os.sep)]
+                    _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0]==None else [__RESOURCE_CLASS__] + _paths +[_method]
+                    _exists_name_dic[_filename] = _file
+                    if(_merged[-1] != __RESOURCE_CLASS__):
+                        print '.'.join(_merged)
+                else:
+                    print __RESOURCE_CLASS__+'.'+_method
 
             cnt+=1
 
-    for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
-        isroot = dir == __RESOURCE_PATH__
-        append_class(subdir_class_name(None if isroot else os.path.basename(dir)))
-        append_files('NSString *', dir, files, isroot)
-        [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
+    if __MAP_DIR__:
+        for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
+            isroot = dir == __RESOURCE_PATH__
+
+            append_class(subdir_class_name(None if isroot else os.path.basename(dir)))
+            append_files('NSString *', dir, files, isroot)
+            [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
+            append_end()
+    else:
+        append_class(subdir_class_name(None))
+        for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
+            append_files('NSString *', dir, files, True)
         append_end()
 
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
