@@ -74,7 +74,6 @@ def begin_objc_implementation(class_name):
     .format(class_name))
 
 def end_objc_file(path, content):
-    content += '@end'
     path = path if os.path.isabs(path) else os.path.join(__RESOURCE_PATH__, path)
     f = open(path, 'w')
     f.write(content)
@@ -111,11 +110,17 @@ if __name__ == "__main__":
 
     header_file_content = begin_objc_interface_file(__RESOURCE_CLASS__)
     impl_file_content = begin_objc_implementation_file(__RESOURCE_CLASS__)
-
     cnt = 0
 
-    def append_static_file(file_name, file):
-        _method_line = make_method_line('NSString *', file_name, True)
+    def append_end():
+        global header_file_content
+        global impl_file_content
+        header_file_content += '@end\n\n'
+        impl_file_content += '@end\n\n'
+
+#MARK: concat strs
+    def append_method(type, name, file, isstatic):
+        _method_line = make_method_line(type, name, isstatic)
         global header_file_content
         global impl_file_content
         header_file_content += (_method_line + '\n\n')
@@ -126,6 +131,17 @@ if __name__ == "__main__":
         global impl_file_content
         header_file_content += begin_objc_interface(class_name)
         impl_file_content += begin_objc_implementation(class_name)
+
+#MARK: file system
+    def append_files(type, dir, files, isstatic):
+        global cnt
+        for file_name in files:
+            file = os.path.join(dir, file_name)
+            if check_ignore(file):
+                continue
+            _file = os.path.basename(file)
+            [[append_method(type, _alias, _file, isstatic)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
+            cnt+=1
 
     def append_subdirs(subdirs):
         #root
@@ -151,7 +167,8 @@ if __name__ == "__main__":
 
         global header_file_content
         global impl_file_content
-        header_file_content += (make_method_line(_subclass_name, subdir_name, True) + '\n\n')
+
+        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, True) + '\n\n')
         impl_file_content += textwrap.dedent(
             """\
             + ({rcls} *){0}; {{
@@ -165,29 +182,17 @@ if __name__ == "__main__":
             """\
         .format(subdir_name,rcls=_subclass_name)) + '\n'
 
-    for root, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):#os.walk(__RESOURCE_PATH__):
-        cur_dir = os.path.basename(root)
-        if not cur_dir:
+    for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):#os.walk(__RESOURCE_PATH__):
+        dirname = os.path.basename(dir)
+        if not dirname:
             continue
 
-        print '----',dirs if dirs else 'A'
+        isroot = dir == __RESOURCE_PATH__
 
-        # append_subdirs(dirs)
-        append_class(subdir_class_name(cur_dir if root!=__RESOURCE_PATH__ else None))
-
-        [[ append_subdir_class_defines(_subdir) ] for _subdir in dirs]
-
-        for file_name in files:
-            file = os.path.join(root, file_name)
-
-            if check_ignore(file):
-                continue
-
-            _file = os.path.basename(file)
-
-            [[append_static_file(_alias, _file)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
-
-            cnt+=1
+        append_class(subdir_class_name(None if isroot else dirname))
+        append_files('NSString *', dir, files, isroot)
+        [[append_subdir_class_defines(_subdir)] for _subdir in dirs]
+        append_end()
 
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.m'), impl_file_content)
