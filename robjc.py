@@ -10,6 +10,7 @@ import time
 import os
 import sys
 import re
+import textwrap
 from os.path import expanduser
 
 if len(sys.argv) == 1:
@@ -37,17 +38,28 @@ def check_truncate(file, patt):
 def check_ignore(file):
     return os.path.basename(file).startswith('.') or not os.path.isfile(file) or os.path.getsize(file)<1
 
+#MARK: file headers
 def begin_objc_interface(class_name):
-    content = '#import <objc/NSObject.h>\n'
-    content += '@class NSString;\n\n'
-    content += '@interface '+class_name+' : NSObject\n\n'
-    return content
+    return textwrap.dedent(
+        """\
+        #import <objc/NSObject.h>
+        @class NSString;
+
+        @interface {0} : NSObject
+
+        """\
+    .format(class_name))
 
 def begin_objc_implementation(class_name):
-    content = '#import <Foundation/Foundation.h>\n'
-    content += '#import "'+class_name+'.h"\n\n'
-    content += '@implementation '+class_name+'\n\n'
-    return content
+    return textwrap.dedent(
+        """\
+        #import <Foundation/Foundation.h>
+        #import \"{0}.h\"
+
+        @implementation {0}
+
+        """\
+    .format(class_name))
 
 def end_objc_file(path, content):
     content += '@end'
@@ -56,6 +68,22 @@ def end_objc_file(path, content):
     f.write(content)
     f.close()
     return content
+
+#MARK: make method strings
+def make_method_line(name):
+    return '+ (NSString *){0};'.format(name)
+
+def make_method_content(content):
+    return textwrap.dedent(
+        """\
+         {{
+            {0}
+        }}
+        """\
+    .format(content))
+
+def make_return_string_line(str_content):
+    return 'return @\"{0}\";'.format(str_content)
 
 #
 # start main job
@@ -68,12 +96,12 @@ if __name__ == "__main__":
     cnt = 0
 
     def append_file(file_name, file):
-        _method_line = '+ (NSString *)'+file_name+';'
+        _method_line = make_method_line(file_name)
 
         global header_file_content
         global impl_file_content
         header_file_content += (_method_line + '\n\n')
-        impl_file_content += (_method_line + ' {\n    return @"'+file+'";\n}\n\n')
+        impl_file_content += (_method_line + make_method_content(make_return_string_line(file)) + '\n')
 
     for root, dirs, files in os.walk(__RESOURCE_PATH__):
         cur_dir = os.path.basename(root)
