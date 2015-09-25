@@ -82,11 +82,11 @@ def end_objc_file(path, content):
     return content
 
 #MARK: make method strings
-def make_static_method_line(name):
-    return '+ (NSString *){0};'.format(name)
+def make_method_line(type, name, isstatic):
+    return '{0} ({1}){2};'.format('+' if isstatic else '-', type, name)
 
-def make_static_method(content):
-    return make_static_method_line(make_method_content(content))
+def make_static_method(type, name, content, isstatic):
+    return make_method_line(type, name, make_method_content(content), isstatic)
 
 def make_method_content(content):
     return textwrap.dedent(
@@ -115,7 +115,7 @@ if __name__ == "__main__":
     cnt = 0
 
     def append_static_file(file_name, file):
-        _method_line = make_static_method_line(file_name)
+        _method_line = make_method_line('NSString *', file_name, True)
         global header_file_content
         global impl_file_content
         header_file_content += (_method_line + '\n\n')
@@ -151,7 +151,7 @@ if __name__ == "__main__":
 
         global header_file_content
         global impl_file_content
-        header_file_content += (make_static_method_line(subdir_name/) + '\n\n')
+        header_file_content += (make_method_line(_subclass_name, subdir_name, True) + '\n\n')
         impl_file_content += textwrap.dedent(
             """\
             + ({rcls} *){0}; {{
