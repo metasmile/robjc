@@ -65,6 +65,8 @@ def begin_objc_implementation_file(class_name):
         #import <Foundation/Foundation.h>
         #import \"{0}.h\"
 
+        #define ROBJC_DispatchOnce(block) static dispatch_once_t onceToken; dispatch_once(&onceToken, block);
+        
         """\
     .format(class_name))
 
@@ -99,7 +101,6 @@ def make_method_content(content):
         """\
     .format(content))
 
-#define BlockOnce(block) static dispatch_once_t onceToken; dispatch_once(&onceToken, block);
 def make_singleton_method(name, classname, isstatic):
     name = resolve_chars(name)
     classname = resolve_chars(classname)
@@ -108,10 +109,9 @@ def make_singleton_method(name, classname, isstatic):
         """\
         {symbol} ({rcls} *){0}; {{
             static {rcls} * instance_{0};
-            static dispatch_once_t onceToken_{0};
-            dispatch_once(&onceToken_{0}, ^{{
+            ROBJC_DispatchOnce(^{{
                 instance_{0} = [[{rcls} alloc] init];
-            }});
+            }})
             return instance_{0};
         }}
         """\
