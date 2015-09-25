@@ -26,6 +26,9 @@ __DELIMETER_ALIAS__ = '='
 #
 # define func
 #
+def resolve_chars(name):
+    return re.sub('[^_\w]', '_ERR_', re.sub('^[0-9]', '_'+name[0], name).replace(' ',''))
+
 def get_splited_first(str, delimeter):
     s_arr = str.split(delimeter)
     if not len(s_arr) > 1: return None
@@ -82,7 +85,7 @@ def end_objc_file(path, content):
 
 #MARK: make method strings
 def make_method_line(type, name, isstatic):
-    return '{0} ({1}){2};'.format('+' if isstatic else '-', type, name)
+    return '{0} ({1}){2};'.format('+' if isstatic else '-', type, resolve_chars(name))
 
 def make_static_method(type, name, content, isstatic):
     return make_method_line(type, name, make_method_content(content), isstatic)
@@ -96,7 +99,11 @@ def make_method_content(content):
         """\
     .format(content))
 
+#define BlockOnce(block) static dispatch_once_t onceToken; dispatch_once(&onceToken, block);
 def make_singleton_method(name, classname, isstatic):
+    name = resolve_chars(name)
+    classname = resolve_chars(classname)
+
     return textwrap.dedent(
         """\
         {symbol} ({rcls} *){0}; {{
@@ -114,7 +121,7 @@ def make_return_string_line(str_content):
     return 'return @\"{0}\";'.format(str_content)
 
 def subdir_class_name(subdir_name):
-    return '{0}_{1}'.format(__RESOURCE_CLASS__, subdir_name) if subdir_name else __RESOURCE_CLASS__
+    return '{0}_{1}'.format(__RESOURCE_CLASS__, resolve_chars(subdir_name)) if subdir_name else __RESOURCE_CLASS__
 
 #
 # start main job
@@ -146,6 +153,13 @@ if __name__ == "__main__":
         header_file_content += begin_objc_interface(class_name)
         impl_file_content += begin_objc_implementation(class_name)
 
+    def append_subdir_class_defines(subdir_name, isstatic):
+        _subclass_name = subdir_class_name(subdir_name)
+        global header_file_content
+        global impl_file_content
+        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, isstatic) + '\n\n')
+        impl_file_content += make_singleton_method(subdir_name, _subclass_name, isstatic) + '\n'
+
 #MARK: file system
     def append_files(type, dir, files, isstatic):
         global cnt
@@ -157,14 +171,7 @@ if __name__ == "__main__":
             [[append_method(type, _alias, _file, isstatic)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
             cnt+=1
 
-    def append_subdir_class_defines(subdir_name, isstatic):
-        _subclass_name = subdir_class_name(subdir_name)
-        global header_file_content
-        global impl_file_content
-        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, isstatic) + '\n\n')
-        impl_file_content += make_singleton_method(subdir_name, _subclass_name, isstatic) + '\n'
-
-    for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):#os.walk(__RESOURCE_PATH__):
+    for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
         dirname = os.path.basename(dir)
         if not dirname:
             continue
