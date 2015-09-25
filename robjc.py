@@ -96,6 +96,20 @@ def make_method_content(content):
         """\
     .format(content))
 
+def make_singleton_method(name, classname, isstatic):
+    return textwrap.dedent(
+        """\
+        {symbol} ({rcls} *){0}; {{
+            static {rcls} * instance_{0};
+            static dispatch_once_t onceToken_{0};
+            dispatch_once(&onceToken_{0}, ^{{
+                instance_{0} = [[{rcls} alloc] init];
+            }});
+            return instance_{0};
+        }}
+        """\
+    .format(name, symbol='+' if isstatic else '-', rcls=classname))
+
 def make_return_string_line(str_content):
     return 'return @\"{0}\";'.format(str_content)
 
@@ -143,44 +157,12 @@ if __name__ == "__main__":
             [[append_method(type, _alias, _file, isstatic)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
             cnt+=1
 
-    def append_subdirs(subdirs):
-        #root
-        for subdir in subdirs:
-            header_file_content += begin_objc_interface(subdir)
-            impl_file_content += begin_objc_implementation(subdir)
-
-            impl_file_content += textwrap.dedent(
-                """\
-                + ({rcls} *){0}; {{
-                    static {rcls} * instance_{0};
-                    static dispatch_once_t onceToken_{0};
-                    dispatch_once(&onceToken_{0}, ^{{
-                        instance_{0} = [[{rcls} alloc] init];
-                    }});
-                    return instance_{0};
-                }}
-                """\
-            .format(dirname,rcls=subdir_class_name(dirname))) + '\n'
-
-    def append_subdir_class_defines(subdir_name):
+    def append_subdir_class_defines(subdir_name, isstatic):
         _subclass_name = subdir_class_name(subdir_name)
-
         global header_file_content
         global impl_file_content
-
-        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, True) + '\n\n')
-        impl_file_content += textwrap.dedent(
-            """\
-            + ({rcls} *){0}; {{
-                static {rcls} * instance_{0};
-                static dispatch_once_t onceToken_{0};
-                dispatch_once(&onceToken_{0}, ^{{
-                    instance_{0} = [[{rcls} alloc] init];
-                }});
-                return instance_{0};
-            }}
-            """\
-        .format(subdir_name,rcls=_subclass_name)) + '\n'
+        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, isstatic) + '\n\n')
+        impl_file_content += make_singleton_method(subdir_name, _subclass_name, isstatic) + '\n'
 
     for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):#os.walk(__RESOURCE_PATH__):
         dirname = os.path.basename(dir)
@@ -191,7 +173,7 @@ if __name__ == "__main__":
 
         append_class(subdir_class_name(None if isroot else dirname))
         append_files('NSString *', dir, files, isroot)
-        [[append_subdir_class_defines(_subdir)] for _subdir in dirs]
+        [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
         append_end()
 
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
