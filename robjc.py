@@ -6,26 +6,36 @@
 # Copyright (c) 2015 Xoropsax cyrano905@gmail.com (github.com/metasmile)
 #
 
-import time
-import os
-import sys
-import re
-import textwrap
+import time, os, sys, re, textwrap, argparse, pprint
 from os.path import expanduser
 
-if len(sys.argv) == 1:
-    print 'usage : python robjc.py [target dir] [destination dir] [class name]'
-    sys.exit(0)
+parser = argparse.ArgumentParser(description='Objective-c resource class generator')
+parser.add_argument('<target path>', help='Target path to read directories. (default=./)', default='.', nargs='?')
+parser.add_argument('<destination path>', help='Destination path to create a class file. (default=./)', default='.', nargs='?')
+parser.add_argument('-c','--class-name', help='Class name. (default=R)', required=False, default='R', nargs='?')
+parser.add_argument('-m','--map-dir-structure', help='Map structure of all directories from target path. (default=False)', required=False, default=False, nargs='?')
+parser.add_argument('-a','--alias-enabled', help='Enabling symbolic alias. (default=False)', required=False, default=True, nargs='?')
+parser.add_argument('-l','--show-log', help='Show log. (default=False)', required=False, default=False, nargs='?')
+args = vars(parser.parse_args())
 
-__RESOURCE_PATH__ = expanduser(sys.argv[1])
-__RESOURCE_CLASS_DEST_PATH__ = expanduser(sys.argv[2]) if len(sys.argv)==3 else './'
-__RESOURCE_CLASS__ = sys.argv[3] if len(sys.argv)==4 else 'R'
+if args['show_log'] is not None: sys.stdout = open(os.devnull, "w")
+
+print 'Start by option:\n'
+pprint.pprint(args, width=1)
+
+__RESOURCE_PATH__ = expanduser(args['<target path>'])
+__RESOURCE_CLASS_DEST_PATH__ = expanduser(expanduser(args['<destination path>']))
+__RESOURCE_CLASS__ = args['class_name']
+__MAP_DIR__ = args['map_dir_structure'] is None
+__ALIAS_ENABLED__ = args['alias_enabled'] is None
 __DELIMETER__ = '_'
 __DELIMETER_ALIAS__ = '='
-
 #
 # define func
 #
+def resolve_chars(name):
+    return re.sub('[^_\w]', '__', re.sub('^[0-9]', '_'+name[0], name).replace(' ',''))
+
 def get_splited_first(str, delimeter):
     s_arr = str.split(delimeter)
     if not len(s_arr) > 1: return None
@@ -39,13 +49,30 @@ def check_ignore(file):
     return os.path.basename(file).startswith('.') or not os.path.isfile(file) or os.path.getsize(file)<1
 
 #MARK: file headers
-def begin_objc_interface(class_name):
+def begin_objc_interface_file(class_name):
     return textwrap.dedent(
         """\
         #import <objc/NSObject.h>
         @class NSString;
 
+        """\
+    .format(class_name))
+
+def begin_objc_interface(class_name):
+    return textwrap.dedent(
+        """\
         @interface {0} : NSObject
+
+        """\
+    .format(class_name))
+
+def begin_objc_implementation_file(class_name):
+    return textwrap.dedent(
+        """\
+        #import <Foundation/Foundation.h>
+        #import \"{0}.h\"
+
+        #define ROBJC_DispatchOnce(block) static dispatch_once_t onceToken; dispatch_once(&onceToken, block);
 
         """\
     .format(class_name))
@@ -53,16 +80,12 @@ def begin_objc_interface(class_name):
 def begin_objc_implementation(class_name):
     return textwrap.dedent(
         """\
-        #import <Foundation/Foundation.h>
-        #import \"{0}.h\"
-
         @implementation {0}
 
         """\
     .format(class_name))
 
 def end_objc_file(path, content):
-    content += '@end'
     path = path if os.path.isabs(path) else os.path.join(__RESOURCE_PATH__, path)
     f = open(path, 'w')
     f.write(content)
@@ -70,8 +93,11 @@ def end_objc_file(path, content):
     return content
 
 #MARK: make method strings
-def make_method_line(name):
-    return '+ (NSString *){0};'.format(name)
+def make_method_line(type, name, isstatic):
+    return '{0} ({1}){2};'.format('+' if isstatic else '-', type, resolve_chars(name))
+
+def make_static_method(type, name, content, isstatic):
+    return make_method_line(type, name, make_method_content(content), isstatic)
 
 def make_method_content(content):
     return textwrap.dedent(
@@ -82,8 +108,27 @@ def make_method_content(content):
         """\
     .format(content))
 
+def make_singleton_method(name, classname, isstatic):
+    name = resolve_chars(name)
+    classname = resolve_chars(classname)
+
+    return textwrap.dedent(
+        """\
+        {symbol} ({rcls} *){0}; {{
+            static {rcls} * instance_{0};
+            ROBJC_DispatchOnce(^{{
+                instance_{0} = [[{rcls} alloc] init];
+            }})
+            return instance_{0};
+        }}
+        """\
+    .format(name, symbol='+' if isstatic else '-', rcls=classname))
+
 def make_return_string_line(str_content):
     return 'return @\"{0}\";'.format(str_content)
+
+def subdir_class_name(subdir_name):
+    return '{0}_{1}'.format(__RESOURCE_CLASS__, resolve_chars(subdir_name)) if subdir_name else __RESOURCE_CLASS__
 
 #
 # start main job
@@ -91,34 +136,76 @@ def make_return_string_line(str_content):
 if __name__ == "__main__":
     start = time.time()
 
-    header_file_content = begin_objc_interface(__RESOURCE_CLASS__)
-    impl_file_content = begin_objc_implementation(__RESOURCE_CLASS__)
+    header_file_content = begin_objc_interface_file(__RESOURCE_CLASS__)
+    impl_file_content = begin_objc_implementation_file(__RESOURCE_CLASS__)
     cnt = 0
 
-    def append_file(file_name, file):
-        _method_line = make_method_line(file_name)
+    def append_end():
+        global header_file_content
+        global impl_file_content
+        header_file_content += '@end\n\n'
+        impl_file_content += '@end\n\n'
 
+#MARK: concat strs
+    def append_method(type, name, file, isstatic):
+        _method_line = make_method_line(type, name, isstatic)
         global header_file_content
         global impl_file_content
         header_file_content += (_method_line + '\n\n')
         impl_file_content += (_method_line + make_method_content(make_return_string_line(file)) + '\n')
+        return _method_line
 
-    for root, dirs, files in os.walk(__RESOURCE_PATH__):
-        cur_dir = os.path.basename(root)
-        if not cur_dir:
-            continue
+    def append_class(class_name):
+        global header_file_content
+        global impl_file_content
+        header_file_content += begin_objc_interface(class_name)
+        impl_file_content += begin_objc_implementation(class_name)
 
+    def append_subdir_class_defines(subdir_name, isstatic):
+        _subclass_name = subdir_class_name(subdir_name)
+        global header_file_content
+        global impl_file_content
+        header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, isstatic) + '\n\n')
+        impl_file_content += make_singleton_method(subdir_name, _subclass_name, isstatic) + '\n'
+
+#MARK: file system
+    def append_files(type, dir, files, isstatic):
+        global cnt
+        _exists_name_dic = {}
         for file_name in files:
-            file = os.path.join(root, file_name)
-
+            file = os.path.join(dir, file_name)
             if check_ignore(file):
                 continue
 
             _file = os.path.basename(file)
+            _names = os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__) if __ALIAS_ENABLED__ else [_file]
 
-            [[append_file(_alias, _file)] for _alias in os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__)]
+            for _filename in _names:
+                _method = re.sub('^[+-]\s\(NSString\s\*\)', '', append_method(type, '{0}_{1}'.format(_filename, os.path.splitext(_file)[1][1:]) if _filename in _exists_name_dic else _filename, _file, isstatic))
+                if __MAP_DIR__:
+                    _paths = [ resolve_chars(path) if len(path)>0 else None for path in os.path.split(os.path.relpath(file,__RESOURCE_PATH__))[0].split(os.sep)]
+                    _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0]==None else [__RESOURCE_CLASS__] + _paths +[_method]
+                    _exists_name_dic[_filename] = _file
+                    if(_merged[-1] != __RESOURCE_CLASS__):
+                        print '.'.join(_merged)
+                else:
+                    print __RESOURCE_CLASS__+'.'+_method
 
             cnt+=1
+
+    if __MAP_DIR__:
+        for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
+            isroot = dir == __RESOURCE_PATH__
+
+            append_class(subdir_class_name(None if isroot else os.path.basename(dir)))
+            append_files('NSString *', dir, files, isroot)
+            [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
+            append_end()
+    else:
+        append_class(subdir_class_name(None))
+        for dir, dirs, files in reversed(list(os.walk(__RESOURCE_PATH__))):
+            append_files('NSString *', dir, files, True)
+        append_end()
 
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.h'), header_file_content)
     end_objc_file(os.path.join(__RESOURCE_CLASS_DEST_PATH__, __RESOURCE_CLASS__+'.m'), impl_file_content)

@@ -1,9 +1,32 @@
 # R_objc
 Simple objective-c resource class generator inspired by android.R.
 
-## how to use
+## usage
 ```
- $ python robjc.py [TARGET DIR] [DESTINATION DIR (relative or absolute, default = same dir ./)] [CLASS NAME(default = 'R')]
+$ robjc ~/Documents/myproj/resources
+```
+```
+usage: robjc.py [-h] [-c [CLASS_NAME]] [-m [MAP_DIR_STRUCTURE]]
+                [-a [ALIAS_ENABLED]] [-l [SHOW_LOG]]
+                [<target path>] [<destination path>]
+
+Objective-c resource class generator
+
+positional arguments:
+  <target path>         Target path to read directories. (default=./)
+  <destination path>    Destination path to create a class file. (default=./)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c [CLASS_NAME], --class-name [CLASS_NAME]
+                        Class name. (default=R)
+  -m [MAP_DIR_STRUCTURE], --map-dir-structure [MAP_DIR_STRUCTURE]
+                        Map structure of all directories from target path.
+                        (default=False)
+  -a [ALIAS_ENABLED], --alias-enabled [ALIAS_ENABLED]
+                        Enabling symbolic alias. (default=False)
+  -l [SHOW_LOG], --show-log [SHOW_LOG]
+                        Show log. (default=False)
 ```
 It generates
 ```
@@ -14,6 +37,29 @@ R.m
 and then, You can use it like below after import.
 ```objective-c
 R.image_name
+```
+
+### Mapping dir structure
+You can write same directory structure via target path.
+```
+/Users/user/Documents/myproj/resources/image1.png
+~/Documents/myproj/resources/image2.png
+~/Documents/myproj/resources/sounds/sound1.caf
+~/Documents/myproj/resources/sounds/sound2.caf
+~/Documents/myproj/resources/sounds/ui/sound3.caf
+```
+add a option '-m'.
+```
+$ robjc -m ~/Documents/myproj/resources
+```
+
+result:
+```objective-c
+R.image1
+R.image2
+R.sounds.sound1
+R.sounds.sound2
+R.sounds.ui.sound3
 ```
 
 ### Make a symbolic alias
@@ -30,6 +76,10 @@ In that case, change the file name, as shown below.
 
 ```
 use_for_caseA=use_for_caseB=blabla.svg
+```
+add a option '-a'.
+```
+$ robjc -a ~/Documents/myproj/resources
 ```
 
 result :
@@ -63,4 +113,4 @@ R.blabla
 * [ ] Support Xcode's i18n policy
 * [ ] Generate a util category for taking UIImage or SVGKImage.
 * ```ex) R.image_name.image / [[R.image_name] imageAsSVG:(CGSize)size]```
-* [ ] Support DIR structure mapping 
+* [x] Support DIR structure mapping
