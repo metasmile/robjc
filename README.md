@@ -114,3 +114,5 @@ R.blabla
 * [ ] Generate a util category for taking UIImage or SVGKImage.
 * ```ex) R.image_name.image / [[R.image_name] imageAsSVG:(CGSize)size]```
 * [x] Support DIR structure mapping
+* [ ] Add a feature to validate file of resource.(initialize-time checking)
+* [ ] Support css's @media query-like filtering, sorting, mapping feature.(e.g. R.png.{only png files}, R.xib.{only xib files}
