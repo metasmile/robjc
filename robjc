@@ -15,7 +15,8 @@ parser = argparse.ArgumentParser(description='Objective-c resource class generat
 parser.add_argument('<target path>', help='Target path to read directories. (default=./)', default='.', nargs='?')
 parser.add_argument('<destination path>', help='Destination path to create a class file. (default=./)', default='.', nargs='?')
 parser.add_argument('-c','--class-name', help='Class name. (default=R)', required=False, default='R', nargs='?')
-parser.add_argument('-m','--map-dir-structure', help='Map structure of all directories from target path. (default=False)', required=False, default=False, nargs='?')
+parser.add_argument('-m','--map-dir-structure',
+                    help='Map structure of all directories from target path. (default=False)', required=False, default=False, nargs='?')
 parser.add_argument('-a','--alias-enabled', help='Enabling symbolic alias. (default=False)', required=False, default=True, nargs='?')
 parser.add_argument('-l','--show-log', help='Show log. (default=False)', required=False, default=False, nargs='?')
 args = vars(parser.parse_args())
@@ -48,7 +49,8 @@ def check_truncate(file, patt):
     return name and name.find(__DELETE_FILE_HEAD__) == 0 and (patt.match(name[len(__DELETE_FILE_HEAD__):]) is not None) and os.path.getsize(file)>0
 
 def check_ignore(file):
-    return os.path.basename(file).startswith('.') or not os.path.isfile(file) or os.path.getsize(file)<1
+    return os.path.basename(file).startswith('.') or not os.path.isfile(file) or 1 > os.path.getsize(file)
+
 
 #MARK: file headers
 def begin_objc_interface_file(class_name):
@@ -99,7 +101,7 @@ def make_method_line(type, name, isstatic):
     return '{0} ({1}){2};'.format('+' if isstatic else '-', type, resolve_chars(name))
 
 def make_static_method(type, name, content, isstatic):
-    return make_method_line(type, name, make_method_content(content), isstatic)
+    return make_method_line(type, name, isstatic)
 
 def make_method_content(content):
     return textwrap.dedent(
@@ -147,6 +149,7 @@ if __name__ == "__main__":
         global impl_file_content
         header_file_content += '@end\n\n'
         impl_file_content += '@end\n\n'
+        return
 
 #MARK: concat strs
     def append_method(type, name, file, isstatic):
@@ -162,6 +165,7 @@ if __name__ == "__main__":
         global impl_file_content
         header_file_content += begin_objc_interface(class_name)
         impl_file_content += begin_objc_implementation(class_name)
+        return
 
     def append_subdir_class_defines(subdir_name, isstatic):
         _subclass_name = subdir_class_name(subdir_name)
@@ -169,6 +173,7 @@ if __name__ == "__main__":
         global impl_file_content
         header_file_content += (make_method_line('{0} *'.format(_subclass_name), subdir_name, isstatic) + '\n\n')
         impl_file_content += make_singleton_method(subdir_name, _subclass_name, isstatic) + '\n'
+        return
 
 #MARK: file system
     def append_files(type, dir, files, isstatic):
@@ -183,12 +188,15 @@ if __name__ == "__main__":
             _names = os.path.splitext(_file)[0].split(__DELIMETER_ALIAS__) if __ALIAS_ENABLED__ else [_file]
 
             for _filename in _names:
-                _method = re.sub('^[+-]\s\(NSString\s\*\)', '', append_method(type, '{0}_{1}'.format(_filename, os.path.splitext(_file)[1][1:]) if _filename in _exists_name_dic else _filename, _file, isstatic))
+                _name = '{0}_{1}'.format(_filename, os.path.splitext(_file)[1][1:]) if _filename in _exists_name_dic else _filename
+                _method = re.sub('^[+-]\s\(NSString\s\*\)', '', append_method(type, _name, _file, isstatic))
                 if __MAP_DIR__:
-                    _paths = [ resolve_chars(path) if len(path)>0 else None for path in os.path.split(os.path.relpath(file,__RESOURCE_PATH__))[0].split(os.sep)]
-                    _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0]==None else [__RESOURCE_CLASS__] + _paths +[_method]
+                    _paths = []
+                    for path in os.path.split(os.path.relpath(file, __RESOURCE_PATH__))[0].split(os.sep):
+                        _paths.append(resolve_chars(path) if len(path) > 0 else None)
+                    _merged = [__RESOURCE_CLASS__] + [_method] if _paths[0] is None else [__RESOURCE_CLASS__] + _paths +[_method]
                     _exists_name_dic[_filename] = _file
-                    if(_merged[-1] != __RESOURCE_CLASS__):
+                    if _merged[-1] != __RESOURCE_CLASS__:
                         print '.'.join(_merged)
                 else:
                     print __RESOURCE_CLASS__+'.'+_method
@@ -201,7 +209,7 @@ if __name__ == "__main__":
 
             append_class(subdir_class_name(None if isroot else os.path.basename(dir)))
             append_files('NSString *', dir, files, isroot)
-            [[append_subdir_class_defines(_subdir, isroot)] for _subdir in dirs]
+            [(append_subdir_class_defines(_subdir, isroot)) for _subdir in dirs]
             append_end()
     else:
         append_class(subdir_class_name(None))
