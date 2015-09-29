@@ -106,6 +106,7 @@ R.blabla
 ```
 
 # TODO
+* [ ] Support On-Demand Resources
 * [ ] Support version of Swift
 * [ ] Integration with [Termini](https://github.com/metasmile/termini)
 * [ ] Automatically import Xcode project with asset files
