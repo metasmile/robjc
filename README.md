@@ -1,5 +1,6 @@
 # R_objc
-Simple objective-c resource class generator inspired by android.R.
+
+Objective-C resource class generator which can be mapped physical dir structure into member properties of a class. Inspired by android.R
 
 ## usage
 ```
